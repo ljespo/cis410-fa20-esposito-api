@@ -1,5 +1,5 @@
 const express = require('express');
-const dbConnectExec = require('./dbConnectExec');
+const bcrypt = require('bcryptjs')
 const db = require('./dbConnectExec.js');
 const app = express();
 const cors = require('cors');
@@ -7,6 +7,50 @@ const cors = require('cors');
 
 //azurewebsites.net, colostate.edu
 app.use(cors())
+app.use(express.json())
+
+
+app.post("/participants", async (req,res)=>{
+    // res.send("Creating user")
+    // console.log("request body", req.body)
+
+    var nameFirst = req.body.nameFirst;
+    var nameLast = req.body.nameLast;
+    var email = req.body.email;
+    var password = req.body.password;
+
+    if(!nameFirst || !nameLast || !email || !password){
+        return res.status(400).send("bad request")
+    }
+
+    nameFirst = nameFirst.replace("'","''")
+    nameLast = nameLast.replace("'","''")
+
+    var emailCheckQuery = `SELECT email
+    FROM Participant
+    WHERE email = '${email}'`
+
+    var existingUser = await db.executeQuery(emailCheckQuery)
+
+    // console.log("existing user", existingUser)
+    if(existingUser[0]){
+        return res.status(409).send('Please enter a different email.')
+    }
+
+    var hashedPassword = bcrypt.hashSync(password)
+
+    var insertQuery = `INSERT INTO Participant(nameFirst, nameLast, email, password)
+    VALUES('${nameFirst}', '${nameLast}', '${email}', '${hashedPassword}')`
+
+    db.executeQuery(insertQuery).then(()=>{
+        res.status(201).send()
+        .catch((err)=>{
+            console.log("error in POST/participants", err)
+            res.status(500).send()
+        })
+    })
+})
+
 
 app.get("/cars", (req,res)=>{
     //get data from database
@@ -41,6 +85,7 @@ app.get("/cars/:pk", (req,res)=>{
             res.status(500).send()
         })
 })
+
 
 const PORT = process.env.PORT || 5000
 app.listen(PORT,()=>{console.log(`app is running on port ${PORT}`)})
