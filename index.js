@@ -1,6 +1,8 @@
 const express = require('express');
-const bcrypt = require('bcryptjs')
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const db = require('./dbConnectExec.js');
+const config = require('./config.js')
 const app = express();
 const cors = require('cors');
 
@@ -9,6 +11,64 @@ const cors = require('cors');
 app.use(cors())
 app.use(express.json())
 
+app.post("/participants/login", async (req,res)=>{
+
+   var email = req.body.email;
+   var password = req.body.password;
+
+   if(!email || !password){
+       return res.status(400).send('bad request')
+   }
+   //check user email exists
+   var query = `SELECT *
+   FROM Participant
+   WHERE email = '${email}'`
+
+   let result;
+
+   try{
+        result = await db.executeQuery(query);
+   }catch(myError){
+       console.log('error in /participants/login:', myError);
+       return res.status(500).send()
+   }
+
+   if(!result[0]){return res.status(400).send('Invalid user credentials')}
+
+   //check their password matches
+   let user = result[0]
+
+   if(!bcrypt.compareSync(password,user.password)){
+       console.log("Invalid password")
+       return res.status(400).send("Invalid user credentials")
+   }
+   
+   //generate a token
+    let token = jwt.sign({pk: user.ParticipantPK}, config.JWT, {expiresIn: '60 minutes'})
+
+   //save token in database and send token and user info back to user
+   let setTokenQuery = `UPDATE Participant
+   SET Token = '${token}'
+   WHERE ParticipantPK = ${user.ParticipantPK}`
+
+   try{
+        await db.executeQuery(setTokenQuery)
+        res.status(200).send({
+            token: token,
+            user: {
+                nameFirst: user.nameFirst,
+                nameLast: user.nameLast,
+                email: user.email,
+                ParticipantPK: user.ParticipantPK
+            }
+        })
+   }
+   catch(myError){
+       console.log("error setting user token ", myError);
+       res.status(500).send()
+   }
+
+})
 
 app.post("/participants", async (req,res)=>{
     // res.send("Creating user")
@@ -42,14 +102,14 @@ app.post("/participants", async (req,res)=>{
     var insertQuery = `INSERT INTO Participant(nameFirst, nameLast, email, password)
     VALUES('${nameFirst}', '${nameLast}', '${email}', '${hashedPassword}')`
 
-    db.executeQuery(insertQuery).then(()=>{
-        res.status(201).send()
+    db.executeQuery(insertQuery)
+    .then(()=>{res.status(201).send()})
         .catch((err)=>{
-            console.log("error in POST/participants", err)
+            console.log("error in POST /participants", err)
             res.status(500).send()
         })
     })
-})
+
 
 
 app.get("/cars", (req,res)=>{
