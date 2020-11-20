@@ -3,13 +3,43 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('./dbConnectExec.js');
 const config = require('./config.js')
+const auth = require('./middleware/authenticate')
 const app = express();
 const cors = require('cors');
+
 
 
 //azurewebsites.net, colostate.edu
 app.use(cors())
 app.use(express.json())
+
+app.get('/participants/me', auth, (req,res)=>{
+    res.send(req.participant)
+})
+
+app.post('/cars/new', auth, async (req,res)=>{
+    
+    try{var year = req.body.year;
+        var make = req.body.make;
+        var model = req.body.model;
+    
+        if(!year || !make || !model){res.status(400).send("bad request")}
+
+     let insertQuery = `INSERT INTO Car(Year, Make, Model, ParticipantFK)
+     OUTPUT inserted.CarPK, inserted.Year, inserted.Make, inserted.Model
+     VALUES('${year}', '${make}', '${model}', ${req.participant.ParticipantPK})`   
+    
+
+    let insertedCar = await db.executeQuery(insertQuery)
+    // console.log(insertedCar)
+    res.status(201).send(insertedCar[0])
+    }
+        catch(error){
+            console.log("error in POST /cars/new", error)
+            res.status(500).send()
+        }
+
+})
 
 app.post("/participants/login", async (req,res)=>{
 
