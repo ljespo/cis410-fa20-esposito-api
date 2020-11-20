@@ -23,8 +23,7 @@ const auth = async(req, res,next)=>{
         if(returnedUser[0]){
             req.participant = returnedUser[0];
             next()
-        }
-        else{res.status(401).send('Authentication Failed.')}
+        }else{res.status(401).send('Authentication Failed.')}
 
     }catch(myError){
         res.status(401).send("Authentication Failed.")

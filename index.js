@@ -17,7 +17,19 @@ app.get('/participants/me', auth, (req,res)=>{
     res.send(req.participant)
 })
 
-app.post('/cars/new', auth, async (req,res)=>{
+app.post('/participants/logout', auth, (req,res)=>{
+     var query = `UPDATE Participant
+     SET token = NULL
+     WHERE ParticipantPK = ${req.participant.ParticipantPK}`
+
+     db.executeQuery(query)
+     .then(()=>{res.send(200).send()})
+     .catch((error)=>{console.log("error in POST /participants/logout")
+        res.status(500).send()
+    })
+})
+
+app.post('/car', auth, async (req,res)=>{
     
     try{var year = req.body.year;
         var make = req.body.make;
@@ -25,20 +37,43 @@ app.post('/cars/new', auth, async (req,res)=>{
     
         if(!year || !make || !model){res.status(400).send("bad request")}
 
-     let insertQuery = `INSERT INTO Car(Year, Make, Model, ParticipantFK)
-     OUTPUT inserted.CarPK, inserted.Year, inserted.Make, inserted.Model
-     VALUES('${year}', '${make}', '${model}', ${req.participant.ParticipantPK})`   
+        let insertQuery = `INSERT INTO Car(Year, Make, Model, ParticipantFK)
+        OUTPUT inserted.CarPK, inserted.Year, inserted.Make, inserted.Model
+        VALUES('${year}', '${make}', '${model}', ${req.participant.ParticipantPK})`   
     
 
-    let insertedCar = await db.executeQuery(insertQuery)
-    // console.log(insertedCar)
-    res.status(201).send(insertedCar[0])
+        let insertedCar = await db.executeQuery(insertQuery)
+        // console.log(insertedCar)
+        res.status(201).send(insertedCar[0])
     }
         catch(error){
             console.log("error in POST /cars/new", error)
             res.status(500).send()
         }
 
+})
+
+app.get('/car/me', auth, async (req,res)=>{
+    
+    let ParticipantPK = req.participant.ParticipantPK;
+
+    var query = `SELECT *
+    FROM Car
+    WHERE ParticipantFK = '${ParticipantPK}'`
+
+    let result;
+
+    try{
+        result = await db.executeQuery(query);
+        res.status(200).send(result)
+   }catch(myError){
+       console.log('error in /car/me', myError);
+       return res.status(500).send()
+   }
+})
+
+app.get("/", (req,res)=>{
+    res.send("Hello World!")
 })
 
 app.post("/participants/login", async (req,res)=>{
